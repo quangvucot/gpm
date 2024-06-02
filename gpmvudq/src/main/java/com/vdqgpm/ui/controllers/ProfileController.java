@@ -1,31 +1,35 @@
 package com.vdqgpm.ui.controllers;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.vdqgpm.libs.ApiResponseSimple;
 import com.vdqgpm.libs.GPMLoginApiV3;
+import com.vdqgpm.models.ApiResponse;
 import com.vdqgpm.models.Profile;
-import com.vdqgpm.models.WebDriverConfig;
-import com.vdqgpm.pages.NurturePage;
-import com.vdqgpm.pages.ProfilePage;
+import com.vdqgpm.services.ExcelReader;
+import com.vdqgpm.services.ProfileProcessor;
+import com.vdqgpm.services.ProfileService;
+import com.vdqgpm.services.ProfileTask;
+import com.vdqgpm.services.ProfileUpdateListener;
 import com.vdqgpm.utilities.AlertActionHandler;
 import com.vdqgpm.utilities.AlertUtils;
 import com.vdqgpm.utilities.Utils;
-
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
@@ -34,11 +38,12 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 import javafx.util.Callback;
 
-public class ProfileController {
+public class ProfileController implements ProfileUpdateListener {
 
-	private ProfilePage profilePage;
 	@FXML
 	private TableView<Profile> profileTable;
 	@FXML
@@ -56,54 +61,98 @@ public class ProfileController {
 	private TextArea logArea;
 
 	@FXML
-	private TextField nameField;
-
-	@FXML
-	private TextField statusField;
-
-	@FXML
-	private TextField lastRunField;
-
-	@FXML
 	private TableColumn<Profile, Void> actionColumn;
-
 	@FXML
 	private TableColumn<Profile, Boolean> selectColumn;
+	@FXML
+	private TextField profileOpen;
 
-	private GPMLoginApiV3 info = null;
+	private final ProfileService profileService;
+
+	@FXML
+	private TextField widthField;
+	@FXML
+	private CheckBox isSendEmail;
+	@FXML
+	private TextField heightField;
+
+	private Stage primaryStage;
+	String url = "http://127.0.0.1:19995/";
+
+	public void setPrimaryStage(Stage primaryStage) {
+		this.primaryStage = primaryStage;
+	}
+
+	public ProfileController() {
+		this.profileService = ProfileService.getInstance();
+	}
 
 	@FXML
 	public void initialize() {
+		nameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
+		statusColumn.setCellValueFactory(new PropertyValueFactory<>("browser_type"));
+		proxyColumn.setCellValueFactory(new PropertyValueFactory<>("raw_proxy"));
+		lastRunColumn.setCellValueFactory(new PropertyValueFactory<>("profile_path"));
 
-		selectColumn.setCellValueFactory(cellData -> cellData.getValue().selectedProperty());
 		selectColumn.setCellFactory(CheckBoxTableCell.forTableColumn(selectColumn));
+		selectColumn.setCellValueFactory(cellData -> cellData.getValue().selectedProperty());
+		actionColumn.setCellFactory(new Callback<TableColumn<Profile, Void>, TableCell<Profile, Void>>() {
+			@Override
+			public TableCell<Profile, Void> call(final TableColumn<Profile, Void> param) {
+				return new TableCell<Profile, Void>() {
+					private final Button btn = new Button();
 
-		CheckBox selectAllCheckbox = new CheckBox();
-		selectColumn.setGraphic(selectAllCheckbox);
+					{
+						btn.setOnAction(event -> {
+							Profile profile = getTableView().getItems().get(getIndex());
+							String url = urlField.getText();
+							if (profile.isRunning()) {
+								profileService.stopSingleProfile(url, profile);
+							} else {
+//								profileService.startProfile(profile);
+							}
+						});
+					}
 
-		selectAllCheckbox.setOnAction(event -> {
-			boolean selected = selectAllCheckbox.isSelected();
-			for (Profile profile : profileTable.getItems()) {
-				profile.setSelected(selected);
+					@Override
+					public void updateItem(Void item, boolean empty) {
+						super.updateItem(item, empty);
+						if (empty) {
+							setGraphic(null);
+						} else {
+							Profile profile = getTableView().getItems().get(getIndex());
+							if (profile.isRunning()) {
+								btn.setText("Stop");
+								btn.setStyle("-fx-background-color: red; -fx-text-fill: white;");
+							} else {
+								btn.setText("Start");
+								btn.setStyle("-fx-background-color: green; -fx-text-fill: white;");
+							}
+							setGraphic(btn);
+						}
+					}
+				};
 			}
 		});
+		setSizeOfColumns();
 		urlField.setText("http://127.0.0.1:19995/");
-
+		url = urlField.getText().toString();
 		profileTable.setRowFactory(tv -> {
 			TableRow<Profile> row = new TableRow<>();
 			row.setOnMouseClicked(event -> {
-				if (!row.isEmpty()) {
+				if (!row.isEmpty() && event.getClickCount() == 1) { // Chỉ xử lý khi click một lần
 					Profile rowData = row.getItem();
 					rowData.setSelected(!rowData.isSelected());
+					profileTable.refresh();
 				}
 			});
 			return row;
 		});
-		nameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
-		statusColumn.setCellValueFactory(new PropertyValueFactory<>("status"));
-		proxyColumn.setCellValueFactory(new PropertyValueFactory<>("proxy"));
-		lastRunColumn.setCellValueFactory(new PropertyValueFactory<>("lastRun"));
-		setSizeOfColumns();
+		profileOpen.textProperty().addListener((observable, oldValue, newValue) -> {
+			if (!newValue.matches("\\d*")) {
+				profileOpen.setText(newValue.replaceAll("[^\\d]", ""));
+			}
+		});
 	}
 
 	private void setSizeOfColumns() {
@@ -112,324 +161,41 @@ public class ProfileController {
 		statusColumn.setPrefWidth(120);
 		proxyColumn.setPrefWidth(200);
 		lastRunColumn.setPrefWidth(150);
-//		urlField.setPrefWidth(500);
-	}
-
-	private Boolean fetchDataToTable(String api) {
-		info = new GPMLoginApiV3(api);
-		List<Profile> profiles = info.fetchProfiles();
-		if (profiles != null && profiles.size() > 0) {
-			profileTable.getItems().setAll(profiles);
-			return true;
-		}
-		return false;
-	}
-
-	private void showProfileDetails(Profile profile) {
-		nameField.setText(profile.getName());
-		statusField.setText(profile.getStatus());
-//	        proxyField.setText(profile.getProxy());
-		lastRunField.setText(profile.getLastRun());
-	}
-
-	@FXML
-	private void handleStart() {
-		AlertUtils.showConfirmationAlert("Bắt đầu profile ", "Chạy các profile đã chọn?", new AlertActionHandler() {
-
-			@Override
-			public void onSuccess() {
-				List<Profile> selectedProfiles = profileTable.getItems().stream().filter(Profile::isSelected)
-						.collect(Collectors.toList());
-
-				for (Profile profile : selectedProfiles) {
-					WebDriverConfig driverConfig = info.startProfile(profile.getId());
-					if (driverConfig != null) {
-						setupActionColumn();
-						profile.setRunning(true);
-						logArea.appendText("Opening profile: " + profile.getName() + "\n");
-						System.out.println("Mở Profile " + profile.getName() + "được mở thành công");
-					} else {
-						logArea.appendText("Opening profile: " + profile.getName() + "\n");
-						System.out.println("Mở Profile " + profile.getName() + "không thành công");
-					}
-
-				}
-
-			}
-
-			@Override
-			public void onFailure() {
-
-			}
-		});
-
-	}
-
-	@FXML
-	private void handleStop() {
-
-		AlertUtils.showConfirmationAlert("Dừng Profile", "Dừng tất cả profile đã chọn?", new AlertActionHandler() {
-
-			@Override
-			public void onSuccess() {
-				List<Profile> selectedProfiles = profileTable.getItems().stream().filter(Profile::isSelected)
-						.collect(Collectors.toList());
-				Task<Void> task = new Task<>() {
-					@Override
-					protected Void call() throws Exception {
-						for (Profile profile : selectedProfiles) {
-							JsonObject jsonObject = Utils.readJson(info.stopProfile(profile.getId()));
-							Boolean stopProfile = jsonObject.get("success").getAsBoolean();
-							if (stopProfile == true) {
-								setupActionColumn();
-								profile.setRunning(false);
-								logArea.appendText("Tắt profile: " + profile.getName() + "\n thành công");
-							} else {
-								logArea.appendText("Tắt profile: " + profile.getName() + "\n thất bại");
-
-							}
-						}
-						return null;
-					}
-				};
-
-			}
-
-			@Override
-			public void onFailure() {
-				// TODO Auto-generated method stub
-
-			}
-		});
-
 	}
 
 	@FXML
 	private void handleGo() {
-		profileTable.getItems().clear();
-		String url = urlField.getText().toString();
-		String validateUrl = "https?:\\/\\/[^\\s/$.?#].[^\\s]*\\/?";
-		Pattern pattern = Pattern.compile(validateUrl);
-		Matcher matcher = pattern.matcher(url);
-		if (!url.equals("") & matcher.find()) {
-			if (url.charAt(url.length() - 1) == '/') {
-				url = url.substring(0, url.length() - 1);
-			}
-			Boolean addProfileStatus = fetchDataToTable(url);
-			if (addProfileStatus) {
-				setupActionColumn();
-				Utils.showAlert("Thông báo", "Thêm dữ liệu thành công", AlertType.CONFIRMATION);
+		profileService.loadProfiles(url, profileTable);
+	}
 
-			} else {
-				Utils.showAlert("Thông báo", "Không tìm thấy dữ liệu", AlertType.INFORMATION);
-			}
-		} else {
-			Utils.showAlert("Thông báo", "Kiểm tra lại URL của bạn", AlertType.WARNING);
+	@FXML
+	private void handleStart() {
+		profileService.startProfile(profileTable, url, this);
+	}
 
-		}
-
+	@FXML
+	private void handleStop() {
+		profileService.stopProfile(url, profileTable);
 	}
 
 	@FXML
 	private void nurtureProfile() {
+		int profileWillOpen = Integer.parseInt(profileOpen.getText());
+		String width = widthField.getText().toString();
+		String height = heightField.getText().toString();
+		profileService.nurtureProfile(url, profileTable, isSendEmail.isSelected(), this, profileWillOpen, width,
+				height);
+	}
 
-		AlertUtils.showConfirmationAlert("Nuôi Profile", "Nuôi tất cả Profile đã chọn?", new AlertActionHandler() {
-
-			@Override
-			public void onSuccess() {
-				List<Profile> selectedProfiles = profileTable.getItems().stream().filter(Profile::isSelected)
-						.collect(Collectors.toList());
-				ExecutorService executorService = Executors.newFixedThreadPool(selectedProfiles.size());
-
-				int delay = 0;
-				for (Profile profile : selectedProfiles) {
-					int finalDelay = delay;
-					executorService.submit(() -> {
-						try {
-
-							// Thread.sleep(finalDelay * 1000); // Thêm trễ nếu cần
-							WebDriverConfig driverConfig = info.startProfile(profile.getId());
-							if (driverConfig != null) {
-								// setupActionColumn();
-								NurturePage nuturePage = new NurturePage();
-								profile.setRunning(true);
-								File file = new File(driverConfig.getDriver_path());
-								nuturePage.setUp(driverConfig.getRemote_address(), file);
-								System.out.println("Driver Remote " + driverConfig.getRemote_address());
-								Platform.runLater(
-										() -> logArea.appendText("Mở profile " + profile.getName() + " thành công\n"));
-
-							} else {
-								logArea.appendText("Opening profile: " + profile.getName() + "\n");
-								Platform.runLater(() -> logArea
-										.appendText("Mở profile " + profile.getName() + "không thành công\n"));
-							}
-						} catch (Exception e) {
-							System.out.println("Lỗi khi thực thi trên profile: " + e.getMessage());
-						} finally {
-							info.stopProfile(profile.getId());
-						}
-					});
-					// delay = (delay + 1) % 2; // Thay đổi khoảng trễ cho mỗi profile
-				}
-				executorService.shutdown();
-			}
-
-			@Override
-			public void onFailure() {
-				// TODO Auto-generated method stub
-
-			}
-		});
+	@Override
+	public void onProfileUpdated(Profile profile, String status) {
+		// TODO Auto-generated method stub
 
 	}
 
-	@FXML
-	private void nurtureProfil2e() {
-
-		AlertUtils.showConfirmationAlert("Nuôi Profile", "Nuôi tất cả Profile đã chọn?", new AlertActionHandler() {
-
-			@Override
-			public void onSuccess() {
-				List<Profile> selectedProfiles = profileTable.getItems().stream().filter(Profile::isSelected)
-						.collect(Collectors.toList());
-				NurturePage nuturePage = new NurturePage();
-				Task<Void> task = new Task<>() {
-					@Override
-					protected Void call() throws Exception {
-						for (Profile profile : selectedProfiles) {
-							WebDriverConfig driverConfig = info.startProfile(profile.getId());
-							if (driverConfig != null) {
-								setupActionColumn();
-								File file = new File(driverConfig.getDriver_path());
-								profile.setRunning(true);
-								nuturePage.setUp(driverConfig.getRemote_address(), file);
-								Platform.runLater(
-										() -> logArea.appendText("Mở profile " + profile.getName() + " thành công\n"));
-							} else {
-								logArea.appendText("Opening profile: " + profile.getName() + "\n");
-								Platform.runLater(() -> logArea
-										.appendText("Mở profile " + profile.getName() + "không thành công\n"));
-							}
-
-						}
-						return null;
-					}
-				};
-
-			}
-
-			@Override
-			public void onFailure() {
-				// TODO Auto-generated method stub
-
-			}
-		});
-
-	}
-
-	private void setupActionColumn() {
-		actionColumn.setCellFactory(new Callback<TableColumn<Profile, Void>, TableCell<Profile, Void>>() {
-			@Override
-			public TableCell<Profile, Void> call(final TableColumn<Profile, Void> param) {
-				final TableCell<Profile, Void> cell = new TableCell<Profile, Void>() {
-
-					private final Button btn = new Button("Start");
-					{
-						btn.setOnAction((event) -> {
-							Profile profile = getTableView().getItems().get(getIndex());
-							if (profile.isRunning()) {
-								if (info != null) {
-									info.stopProfile(profile.getId());
-									profile.setRunning(false);
-									btn.setText("Start");
-									btn.setStyle("-fx-background-color: green; -fx-text-fill: white;");
-									logArea.appendText("Stopped: " + profile.getName() + "\n");
-								}
-							} else {
-								if (info != null) {
-									info.startProfile(profile.getId());
-									profile.setRunning(true);
-									btn.setText("Stop");
-									btn.setStyle("-fx-background-color: red; -fx-text-fill: white;");
-									logArea.appendText("Started: " + profile.getName() + "\n");
-								}
-							}
-						});
-					}
-
-					@Override
-					public void updateItem(Void item, boolean empty) {
-						super.updateItem(item, empty);
-						if (empty) {
-							setGraphic(null);
-						} else {
-							Profile profile = getTableView().getItems().get(getIndex());
-							if (profile.isRunning()) {
-								btn.setText("Stop");
-								btn.setStyle("-fx-background-color: red; -fx-text-fill: white;");
-							} else {
-								btn.setText("Start");
-								btn.setStyle("-fx-background-color: green; -fx-text-fill: white;");
-							}
-							setGraphic(btn);
-						}
-					}
-				};
-				return cell;
-			}
-		});
-	}
-
-	private void addButtonToTable() {
-
-		actionColumn.setCellFactory(new Callback<TableColumn<Profile, Void>, TableCell<Profile, Void>>() {
-			@Override
-			public TableCell<Profile, Void> call(final TableColumn<Profile, Void> param) {
-				final TableCell<Profile, Void> cell = new TableCell<Profile, Void>() {
-
-					private final Button btn = new Button("Start");
-					{
-						btn.setOnAction((event) -> {
-							Profile profile = getTableView().getItems().get(getIndex());
-							if (profile.isRunning()) {
-								profile.setRunning(false);
-								btn.setText("Start");
-								logArea.appendText("Stopped: " + profile.getName() + "\n");
-								btn.setStyle("-fx-background-color: green; -fx-text-fill: white;");
-
-							} else {
-								profile.setRunning(true);
-								btn.setText("Stop");
-								logArea.appendText("Started: " + profile.getName() + "\n");
-								btn.setStyle("-fx-background-color: red; -fx-text-fill: white;");
-							}
-						});
-					}
-
-					@Override
-					public void updateItem(Void item, boolean empty) {
-						super.updateItem(item, empty);
-						if (empty) {
-							setGraphic(null);
-						} else {
-							Profile profile = getTableView().getItems().get(getIndex());
-							if (profile.isRunning()) {
-								btn.setText("Stop");
-
-								btn.setStyle("-fx-background-color: red; -fx-text-fill: white;");
-							} else {
-								btn.setText("Start");
-								btn.setStyle("-fx-background-color: green; -fx-text-fill: white;");
-
-							}
-							setGraphic(btn);
-						}
-					}
-				};
-				return cell;
-			}
-		});
+	@Override
+	public void onProfileError(Profile profile, String error) {
+		// TODO Auto-generated method stub
 
 	}
 

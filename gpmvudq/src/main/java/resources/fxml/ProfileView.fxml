@@ -22,8 +22,15 @@
 	<HBox>
 		<TextField fx:id="urlField" promptText="Enter URL" />
 		<Button text="Tải dữ liệu" onAction="#handleGo" />
+		<HBox>
+			<TextField fx:id="widthField" promptText="Width" />
+			<TextField fx:id="heightField" promptText="height" />
+			<TextField fx:id="profileOpen" promptText="Luồng" />
+		</HBox>
 	</HBox>
-
+	<!-- <HBox> <VBox spacing="10" alignment="CENTER"> <HBox spacing="10" alignment="CENTER"> 
+		<Button text="Chọn tệp" onAction="#handleFileChooser" /> <Label fx:id="fileNameLabel" 
+		text="Không có tệp nào được chọn." /> </HBox> </VBox> </HBox> -->
 	<TableView fx:id="profileTable">
 		<columns>
 			<TableColumn fx:id="selectColumn" />
@@ -40,7 +47,8 @@
 	</HBox>
 	<HBox>
 		<Button text="Nuôi Profile" onAction="#nurtureProfile" />
-
+		<CheckBox fx:id="isSendEmail" text="Có gửi email không?" />
 	</HBox>
-	<TextArea fx:id="logArea"  editable="false" promptText="Log output" />
+	<TextArea fx:id="logArea" editable="false"
+		promptText="Log output" />
 </VBox>

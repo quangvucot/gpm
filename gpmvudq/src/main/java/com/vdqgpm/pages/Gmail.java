@@ -1,22 +1,11 @@
 package com.vdqgpm.pages;
 
-import java.time.Duration;
-
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.interactions.Actions;
-import org.openqa.selenium.support.PageFactory;
-import org.openqa.selenium.support.ui.WebDriverWait;
 
-import com.vdqgpm.utilities.WaitUtils;
-import com.vdqgpm.webdriver.WebDriverFactory;
+public class Gmail extends BasePage {
 
-public class SendGmail {
-	private WebDriver driver;
-	private WebDriverWait wait;
-	private Actions actions;
-	private WaitUtils waitUtils;
 	private By gmail = By.xpath("//a[contains(@href,'https://mail.google.com/mail/') and @class='gb_I']");
 	private By dialogWriteGmail = By
 			.xpath("//td[@class='Hm']//img[@class='Hq aUG' and contains(@src,'images/cleardot.gif')]");
@@ -26,17 +15,13 @@ public class SendGmail {
 	private By content = By.xpath("//div[@class='Am aiL Al editable LW-avf tS-tW' and @role='textbox']");
 	private By loginButton = By.xpath("//div[@class='T-I J-J5-Ji aoO v7 T-I-atl L3']");
 
-	// Constructor
-	public SendGmail(WebDriver driver, long timeoutInSeconds) {
-		this.driver = WebDriverFactory.getDriver();
-		this.waitUtils = new WaitUtils(driver, timeoutInSeconds);
-		this.actions = new Actions(driver);
-		PageFactory.initElements(driver, this);
+	public Gmail(WebDriver driver, long timeoutInSeconds) {
+		super(driver, timeoutInSeconds);
 	}
 
 	public void moveToGmail() {
 		System.out.println("SendGmail.moveToGmail()");
-		Boolean isEmailVisible = waitUtils.isElementVisible(gmail);
+		Boolean isEmailVisible = isElementVisible(gmail);
 		if (isEmailVisible) {
 			driver.findElement(gmail).click();
 		} else {
@@ -48,10 +33,11 @@ public class SendGmail {
 
 	public void writeMail() {
 		System.out.println("writeMail");
-		Boolean isWriteMailDialogVisibility = waitUtils.waitForElementVisible(writeMail, 10);
+		Boolean isWriteMailDialogVisibility = waitForElementVisible(writeMail, 10);
 		if (isWriteMailDialogVisibility) {
 			WebElement element = driver.findElement(writeMail);
 			element.click();
+
 		} else {
 			System.out.println("Nút Soạn Email không hiễn thị sau 10 giây");
 		}
@@ -59,16 +45,19 @@ public class SendGmail {
 
 	// Phương thức để nhập username
 	public void enterReceiver(String email) {
-
-		Boolean isReceiverVisible = waitUtils.isElementVisible(receiver);
-		if (isReceiverVisible) {
-			waitUtils.sleepSecond(4000);
-			WebElement receiverElement = driver.findElement(receiver);
-			System.out.println("Nhập Email");
-			waitUtils.sendKeysSlowly(receiverElement, email, 200);
-			waitUtils.sleepSecond(5000);
-		} else {
-			System.out.println("Không nhập được Email người nhận");
+		sleepSecond(3000);
+		Boolean isWriteMailDialogVisibility = waitForElementVisible(dialogWriteGmail, 30);
+		if (isWriteMailDialogVisibility) {
+			sleepSecond(1000);
+			Boolean isReceiverVisible = isElementVisible(receiver);
+			if (isReceiverVisible) {
+				WebElement receiverElement = driver.findElement(receiver);
+				System.out.println("Nhập Email");
+				sendKeysSlowly(receiverElement, email, 200);
+				sleepSecond(5000);
+			} else {
+				System.out.println("Không nhập được Email người nhận");
+			}
 		}
 
 	}
@@ -77,20 +66,20 @@ public class SendGmail {
 	public void enterSubject(String subject) {
 		WebElement subjectElement = driver.findElement(title);
 		System.out.println("Nhập Tiêu đề");
-		waitUtils.sendKeysSlowly(subjectElement, subject, 100);
-		waitUtils.sleepSecond(5000);
+		sendKeysSlowly(subjectElement, subject, 100);
+		sleepSecond(5000);
 	}
 
 	// Phương thức để nhập password
 	public void enterBody(String body) {
 		WebElement bodyElement = driver.findElement(content);
-		waitUtils.sendKeysSlowly(bodyElement, body, 100);
-		waitUtils.sleepSecond(5000);
+		sendKeysSlowly(bodyElement, body, 100);
+		sleepSecond(5000);
 	}
 
 	// Phương thức để nhấn vào nút đăng nhập
 	public void clickSendEmail() {
 		driver.findElement(loginButton).click();
+		sleepSecond(5000);
 	}
-
 }

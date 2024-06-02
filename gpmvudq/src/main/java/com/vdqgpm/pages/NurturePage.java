@@ -1,38 +1,43 @@
 package com.vdqgpm.pages;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.concurrent.Executors;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeDriverService;
-import org.openqa.selenium.chrome.ChromeOptions;
-
 import com.vdqgpm.webdriver.WebDriverManager;
-
-import java.util.concurrent.ExecutorService;
 
 public class NurturePage {
 	// private static final int MAX_THREADS = 10; // Số lượng profile tối đa có thể
 	// mở cùng lúc
 	private static final Logger logger = LogManager.getLogger(NurturePage.class);
 
-	public void setUp(String remoteAddress, File file) throws InterruptedException {
+	public void setUp(String remoteAddress, File file, String width, String height, int x, int y, Boolean isSendEmail)
+			throws InterruptedException {
 		WebDriverManager webDriverManager = new WebDriverManager();
-		WebDriver driver = webDriverManager.initializeDrivers(file, remoteAddress);
+		WebDriver driver = webDriverManager.initializeDrivers(file, remoteAddress, width, height, x, y);
 		if (driver != null) {
 			try {
 				driver.get("https://google.com/");
-				SendGmail sendGmail = new SendGmail(driver, 10);
-				sendGmail.moveToGmail();
-				sendGmail.writeMail();
-				sendGmail.enterReceiver("daoquangvu.it01@gmail.com");
-				sendGmail.enterSubject("Thư mời đi tham gia sự kiện của công Ty BaclinkAZ");
-				sendGmail.enterBody("Xin chào bạn!");
-				// sendGmail.clickSendEmail();
+				if (!isSendEmail) {
+					SendGmail sendGmail = new SendGmail(driver, 20);
+					sendGmail.moveToGmail();
+					sendGmail.writeMail();
+					sendGmail.enterReceiver("daoquangvu.it01@gmail.com");
+					sendGmail.enterSubject("Thư mời đi tham gia sự kiện của công Ty BaclinkAZ");
+					sendGmail.enterBody("Xin chào bạn!");
+//					sendGmail.clickSendEmail();
+				}
+
+				ReadGoogleNews readGgNews = new ReadGoogleNews(driver, 20);
+				readGgNews.openNewTab();
+				readGgNews.accessToGoogleFeed();
+				readGgNews.scrollViewNews();
+				readGgNews.readRandomPost();
+
+				YoutubePage youtubePage = new YoutubePage(driver, 20);
+				youtubePage.accessToYoutube();
+				youtubePage.findChanelToWatch();
+				youtubePage.chooseVideoToWatch();
 			} catch (Exception e) {
 				logger.error("Đang xảy ra lỗi tại địa chỉ: " + remoteAddress, e);
 			} finally {
@@ -41,6 +46,18 @@ public class NurturePage {
 
 		}
 
+	}
+
+	public void connectSingleProfile(String remoteAddress, File file) {
+		WebDriverManager webDriverManager = new WebDriverManager();
+		WebDriver driver = webDriverManager.initializeDrivers(file, remoteAddress, "", "", 0, 0);
+		if (driver != null) {
+			try {
+			} catch (Exception e) {
+				logger.error("Đang xảy ra lỗi tại địa chỉ: " + remoteAddress, e);
+			}
+
+		}
 	}
 
 }

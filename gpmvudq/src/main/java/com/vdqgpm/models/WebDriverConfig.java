@@ -2,27 +2,43 @@ package com.vdqgpm.models;
 
 public class WebDriverConfig {
 
-	private String id_profile;
+	private boolean success;
+	private String profile_id;
+	private String browser_location;
+	private String remote_debugging_address;
 	private String driver_path;
-	private String remote_address;
 
-	public WebDriverConfig() {
-
+	// Getters và Setters
+	public boolean isSuccess() {
+		return success;
 	}
 
-	public WebDriverConfig(String driver_path, String remote_address) {
-		super();
-
-		this.driver_path = driver_path;
-		this.remote_address = remote_address;
+	public void setSuccess(boolean success) {
+		this.success = success;
 	}
 
-	public String getId_profile() {
-		return id_profile;
+	public String getProfile_id() {
+		return profile_id;
 	}
 
-	public void setId_profile(String id_profile) {
-		this.id_profile = id_profile;
+	public void setProfile_id(String profile_id) {
+		this.profile_id = profile_id;
+	}
+
+	public String getBrowser_location() {
+		return browser_location;
+	}
+
+	public void setBrowser_location(String browser_location) {
+		this.browser_location = browser_location;
+	}
+
+	public String getRemote_debugging_address() {
+		return remote_debugging_address;
+	}
+
+	public void setRemote_debugging_address(String remote_debugging_address) {
+		this.remote_debugging_address = remote_debugging_address;
 	}
 
 	public String getDriver_path() {
@@ -31,14 +47,6 @@ public class WebDriverConfig {
 
 	public void setDriver_path(String driver_path) {
 		this.driver_path = driver_path;
-	}
-
-	public String getRemote_address() {
-		return remote_address;
-	}
-
-	public void setRemote_address(String remote_address) {
-		this.remote_address = remote_address;
 	}
 
 }
